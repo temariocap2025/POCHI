@@ -1,0 +1,1624 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Pochi</title>
+<script>
+/* Modo sol/luna guardado: se aplica antes de pintar para que no parpadee. */
+(function(){ var m = 'sol'; try{ m = localStorage.getItem('pochi_modo') || 'sol'; }catch(e){}
+  document.documentElement.setAttribute('data-modo', m === 'luna' ? 'luna' : 'sol');
+  document.documentElement.classList.add('js'); })();
+</script>
+<meta name="description" content="Pochi: robot asistente que lleva el medicamento hasta el adulto mayor, a tiempo.">
+<meta name="theme-color" content="#0f2a5c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500;700&family=Lexend:wght@400;500;600;700&display=swap">
+<style>
+/* ==================================================================
+   SISTEMA VISUAL DE POCHI (igual en todas las páginas)
+   Dos modos que el visitante elige en el header y que quedan
+   guardados al navegar:
+   - SOL (predeterminado): fondo blanco suave, tarjetas blancas,
+     texto azul noche. Pensado para leer cómodo.
+   - LUNA: fondo azul oscuro, texto claro, header y footer más oscuros.
+   Firma de color: los ojos turquesa de Pochi y un brillo celeste
+   alrededor de cada contenedor.
+   Tipografías por legibilidad: Lexend (títulos) + Atkinson Hyperlegible.
+   ================================================================== */
+:root{
+  /* ---- modo SOL ---- */
+  --bg:#f2f4f7;           /* blanco "menos blanco" */
+  --surface:#ffffff;
+  --surface-2:#e9eef5;
+  --line:#dbe2ec;
+  --line-strong:#b9c5d6;
+  --ink:#13213c;
+  --ink-dim:#55617a;
+  --accent:#1667c7;
+  --accent-hover:#0f56a8;
+  --pressed:#0fa89b;      /* color al hacer clic */
+  --sky:#4fb3f6;
+  --glow:rgba(79,179,246,.42);   /* sombra celeste de los contenedores */
+  --hdr:#0f2a5c;          /* header y footer (más oscuro que antes, más claro que luna) */
+  --hdr-line:#1f3d75;
+  --hdr-ink:#ffffff;
+  --hdr-dim:#c3d1ea;
+  --navy:#16213e;         /* paneles tipo "pantalla" (juego, arquitectura) */
+  --navy-2:#1f2d52;
+  --navy-line:#2c3c66;
+  --screen:#0e1424;
+  --eye:#00e5d1;          /* ojos de Pochi */
+  --eye-glow:rgba(0,229,209,.45);
+  --floor:#cfd8e5;
+  --orange:#ff7a2f;
+  --ok:#2e8b57;
+  --danger:#c62828;
+  --radius:16px;
+  --font-display:'Lexend','Segoe UI',system-ui,-apple-system,sans-serif;
+  --font-body:'Atkinson Hyperlegible','Segoe UI',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  --header-h:64px;
+  --maxw:1360px;
+  --gl:max(clamp(20px, 4vw, 56px), env(safe-area-inset-left,0px));
+  --gr:max(clamp(20px, 4vw, 56px), env(safe-area-inset-right,0px));
+  color-scheme:light;
+}
+/* ---- modo LUNA ---- */
+html[data-modo="luna"]{
+  --bg:#0e1830;
+  --surface:#15223f;
+  --surface-2:#1b2a4c;
+  --line:#263a63;
+  --line-strong:#3a5283;
+  --ink:#e8eef9;
+  --ink-dim:#a3b1cc;
+  --accent:#5aa9ff;
+  --accent-hover:#7cbcff;
+  --pressed:#19c7b7;
+  --glow:rgba(79,179,246,.32);
+  --hdr:#070e1f;
+  --hdr-line:#1a2848;
+  --hdr-dim:#9fb0cf;
+  --navy:#0a1327;
+  --navy-2:#16244a;
+  --navy-line:#2a3d6b;
+  --floor:#2c3f66;
+  --ok:#4cc184;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{
+  margin:0; min-height:100vh; overflow-x:hidden;
+  background:var(--bg); color:var(--ink);
+  font-family:var(--font-body); font-size:17px; line-height:1.6;
+  transition:background-color .35s ease, color .35s ease;
+}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--hdr);z-index:60}
+h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em;line-height:1.15;text-wrap:balance;margin:0;color:var(--ink)}
+p{margin:0}
+ul{margin:0;padding:0}
+a{color:var(--accent)}
+img{max-width:100%;display:block}
+button{font:inherit;color:inherit}
+code{font-family:var(--font-mono)}
+:focus-visible{outline:3px solid var(--sky);outline-offset:3px;border-radius:8px}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding-left:var(--gl);padding-right:var(--gr);position:relative;z-index:1}
+
+/* ---------- ojos de Pochi: redondos y tiernos ---------- */
+.eyes{--s:40px;display:flex;gap:calc(var(--s)*.5);align-items:center;justify-content:center}
+.eye{width:var(--s);height:var(--s);display:block;flex:none}
+.eye i{
+  position:relative;display:block;width:100%;height:100%;border-radius:50%;
+  background:radial-gradient(circle at 50% 60%, #33f0df 0%, var(--eye) 60%, #00c8b7 100%);
+  box-shadow:0 0 calc(var(--s)*.45) var(--eye-glow);
+  animation:blink 4.2s ease-in-out infinite; transform-origin:center;
+}
+.eye i::after{ /* brillito */
+  content:"";position:absolute;width:30%;height:30%;top:16%;right:18%;
+  border-radius:50%;background:#ffffff;opacity:.9;
+}
+@keyframes blink{0%,86%,100%{transform:scaleY(1)}90%,92%{transform:scaleY(.1)}}
+.eyes-sm{--s:16px} .eyes-md{--s:40px} .eyes-xl{--s:clamp(64px,13vw,104px)}
+.eyes.closed .eye i{animation:none;transform:scaleY(.1)}
+
+/* ---------- header ----------
+   Arriba de todo es alto: el logo va al centro y los botones bajan al
+   centro de abajo. Al bajar se encoge a una sola fila (logo a la
+   izquierda, botones a la derecha) con una transición suave.
+   Va fijo y el body le reserva su alto máximo, así el contenido no salta. */
+:root{--header-big:136px;--logo-big:62px;--logo-small:38px;--hdr-t:.75s;--hdr-ease:cubic-bezier(.65,0,.25,1)}
+@media (max-width:820px){ :root{--header-big:116px;--header-h:60px;--logo-big:42px;--logo-small:30px} }
+@media (max-width:420px){ :root{--logo-big:36px;--logo-small:26px} }
+html{scroll-padding-top:calc(var(--header-h) + 16px)}
+body{padding-top:calc(var(--header-big) + env(safe-area-inset-top,0px))}
+header.site{
+  position:fixed; top:env(safe-area-inset-top,0px); left:0; right:0; z-index:50;
+  background:var(--hdr); color:var(--hdr-ink);
+  border-bottom:1px solid var(--hdr-line);
+  transition:background-color .35s ease, box-shadow .5s ease;
+}
+header.site.compact{box-shadow:0 4px 18px rgba(8,18,40,.22)}
+.nav-row{
+  position:relative; max-width:var(--maxw); margin:0 auto; height:var(--header-big);
+  transition:height var(--hdr-t) var(--hdr-ease);
+}
+header.site.compact .nav-row{height:var(--header-h)}
+.nav-row > .brand, .nav-row > nav.links, .nav-row > .nav-tools{
+  position:absolute;
+  transition:left var(--hdr-t) var(--hdr-ease), top var(--hdr-t) var(--hdr-ease),
+             height var(--hdr-t) var(--hdr-ease), transform var(--hdr-t) var(--hdr-ease);
+}
+
+/* logo: centrado arriba → a la izquierda */
+.brand{
+  left:50%; top:16px; transform:translate(-50%,0);
+  display:flex; align-items:center; text-decoration:none; border-radius:10px; padding:4px;
+}
+header.site.compact .brand{left:calc(var(--gl) - 4px); top:50%; transform:translate(0,-50%)}
+.brand img{
+  height:var(--logo-big); width:auto; max-width:none;
+  transition:height var(--hdr-t) var(--hdr-ease), transform .3s cubic-bezier(.3,1.4,.5,1), filter .3s ease;
+}
+header.site.compact .brand img{height:var(--logo-small)}
+.brand:hover img{transform:scale(1.12);filter:drop-shadow(0 0 10px rgba(0,229,209,.35))}
+
+/* botones: centro abajo → a la derecha */
+nav.links{
+  left:50%; top:calc(var(--header-big) - 50px); height:50px; transform:translate(-50%,0);
+  display:flex; gap:30px; align-items:stretch;
+}
+header.site.compact nav.links{left:calc(100% - var(--gr) - 100px); top:0; height:var(--header-h); transform:translate(-100%,0)}
+nav.links a{
+  color:var(--hdr-dim);text-decoration:none;font-family:var(--font-display);font-weight:400;font-size:.95rem;
+  display:flex;align-items:center;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;
+  transition:color .2s,border-color .2s,transform .2s;
+}
+nav.links a:hover{color:var(--hdr-ink);transform:scale(1.08)}
+nav.links a[aria-current="page"]{color:var(--hdr-ink);border-bottom-color:var(--eye)}
+
+/* sol/luna (y menú en celular): siempre a la derecha */
+.nav-tools{
+  left:calc(100% - var(--gr)); top:calc(16px + 4px + var(--logo-big) / 2); transform:translate(-100%,-50%);
+  display:flex; align-items:center; gap:10px;
+}
+header.site.compact .nav-tools{top:50%}
+
+/* interruptor sol / luna */
+.mode-toggle{
+  position:relative;display:flex;align-items:center;gap:0;padding:3px;border-radius:99px;cursor:pointer;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);flex:none;
+  transition:transform .2s ease, background .2s ease;
+}
+.mode-toggle:hover{transform:scale(1.06);background:rgba(255,255,255,.16)}
+.mode-toggle .knob{
+  position:absolute;top:3px;left:3px;width:34px;height:34px;border-radius:50%;background:#fff;
+  transition:transform .3s cubic-bezier(.3,1.3,.5,1), background .3s ease;
+}
+html[data-modo="luna"] .mode-toggle .knob{transform:translateX(34px);background:#22345e}
+.mode-toggle span.ico{position:relative;z-index:1;width:34px;height:34px;display:grid;place-items:center}
+.mode-toggle svg{width:18px;height:18px}
+.mode-toggle .sun svg{fill:#f2b01e}
+.mode-toggle .moon svg{fill:#c3d1ea}
+html[data-modo="luna"] .mode-toggle .moon svg{fill:#ffe9a8}
+html:not([data-modo="luna"]) .mode-toggle .moon svg{fill:rgba(255,255,255,.7)}
+html[data-modo="luna"] .mode-toggle .sun svg{fill:rgba(255,255,255,.55)}
+
+.nav-toggle{
+  display:none; width:44px; height:44px; border-radius:12px; cursor:pointer;
+  background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.22);
+  flex-direction:column; align-items:center; justify-content:center; gap:5px;
+}
+.nav-toggle span{display:block;width:20px;height:2px;border-radius:2px;background:#fff;transition:transform .25s, opacity .25s}
+.nav-toggle[aria-expanded="true"] span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.nav-toggle[aria-expanded="true"] span:nth-child(2){opacity:0}
+.nav-toggle[aria-expanded="true"] span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+@media (max-width:820px){
+  .nav-toggle{display:flex}
+  /* arriba: logo al centro y botones centrados abajo; al bajar: una fila */
+  .nav-tools{left:50%; top:calc(var(--header-big) - 32px); transform:translate(-50%,-50%)}
+  header.site.compact .nav-tools{left:calc(100% - var(--gr)); top:50%; transform:translate(-100%,-50%)}
+  header.site nav.links, header.site.compact nav.links{
+    left:0; right:0; top:100%; height:auto; order:9;
+    flex-direction:column; align-items:stretch; gap:0;
+    background:var(--hdr); border-bottom:1px solid var(--hdr-line);
+    padding:6px var(--gr) 18px var(--gl);
+    transform:translateY(-10px); opacity:0; visibility:hidden;
+    transition:transform .25s ease, opacity .25s ease, visibility .25s;
+  }
+  header.site nav.links.open{transform:none;opacity:1;visibility:visible}
+  nav.links a{padding:14px 4px;font-size:1.04rem;border-bottom:1px solid var(--hdr-line);margin:0}
+  nav.links a:hover{transform:none}
+  nav.links a[aria-current="page"]{border-bottom-color:var(--hdr-line);color:var(--eye)}
+}
+
+/* ---------- piezas comunes ---------- */
+.section{padding-block:clamp(64px,10vw,120px)}
+.section.tight{padding-block:clamp(44px,7vw,84px)}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;margin-bottom:14px;font:500 .76rem/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.h2{font-size:clamp(1.6rem,3vw,2.3rem);max-width:28ch}
+.lead{font-size:clamp(1rem,1.4vw,1.12rem);color:var(--ink-dim);max-width:62ch;margin-top:14px}
+
+/* botones: crecen al pasar el mouse y cambian de color al hacer clic */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  min-height:46px;padding:10px 22px;border-radius:12px;
+  font-family:var(--font-display);font-weight:500;font-size:.95rem;line-height:1.2;
+  text-decoration:none;border:1px solid transparent;cursor:pointer;
+  transition:transform .18s ease, background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+}
+.btn:hover{transform:scale(1.06)}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff}
+html[data-modo="luna"] .btn-primary{color:#0a1530}
+.btn-primary:hover{background:var(--accent-hover);box-shadow:0 0 15px var(--glow)}
+.btn-ghost{border-color:var(--line-strong);color:var(--ink);background:transparent}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn:active,.btn.pressed{background:var(--pressed)!important;border-color:var(--pressed)!important;color:#fff!important}
+.btn svg{width:18px;height:18px;fill:currentColor}
+.btn-lg{min-height:56px;padding:14px 30px;font-size:1.05rem}
+.btn-light{background:#fff;color:#0f2a5c}
+.btn-light:hover{box-shadow:0 0 18px rgba(0,229,209,.45)}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+
+/* contenedores con brillo celeste de 15 px alrededor */
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:0 0 15px var(--glow);
+  transition:background-color .35s ease, border-color .35s ease;
+}
+.pad{padding:clamp(20px,3vw,28px)}
+.grid-3{display:grid;gap:24px;margin-top:30px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}
+.card h3{font-size:1.15rem;margin-bottom:8px}
+.card p{color:var(--ink-dim);font-size:.96rem}
+.screen-chip{
+  display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+  font-family:var(--font-mono);font-size:.74rem;color:#c6fbf5;
+  background:var(--screen);border:1px solid #2b3449;border-radius:8px;padding:6px 10px;
+}
+.screen-chip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--eye);flex:none}
+
+/* imágenes con lugar reservado (si falta el archivo en Recursos/ muestra el nombre esperado) */
+.media{
+  position:relative;margin:0;overflow:hidden;border-radius:14px;max-width:100%;
+  background:var(--surface-2);border:1px solid var(--line);
+}
+.media img{width:100%;height:100%;object-fit:cover}
+.media-missing{
+  display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  text-align:center;padding:14px;color:var(--ink-dim);font-size:.84rem;
+}
+.media-missing code{font-size:.72rem;color:var(--ink);background:var(--surface);padding:3px 8px;border-radius:6px;border:1px solid var(--line);word-break:break-all}
+.media.missing{background:repeating-linear-gradient(135deg,var(--surface-2) 0 12px,var(--bg) 12px 24px);border-style:dashed;border-color:var(--line-strong)}
+.media.missing img{display:none}
+.media.missing .media-missing{display:flex}
+
+/* mención del colegio */
+.school{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:32px;padding-top:22px;border-top:1px solid var(--line);color:var(--ink-dim);font-size:.96rem}
+.school a{color:var(--accent);font-weight:700}
+
+/* tarjetas "siguiente paso" */
+.next-grid{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.next-card{display:flex;flex-direction:column;gap:8px;padding:24px;color:var(--ink);text-decoration:none;transition:transform .2s ease, border-color .2s ease}
+.next-card:hover{transform:scale(1.03);border-color:var(--accent)}
+.next-card:active{border-color:var(--pressed)}
+.next-card .kicker{font-family:var(--font-display);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim);font-weight:500}
+.next-card h3{font-size:1.15rem;margin:0}
+.next-card p{font-size:.92rem}
+.next-card .go{margin-top:auto;padding-top:6px;font-family:var(--font-display);font-weight:500;font-size:.9rem;color:var(--accent)}
+
+/* encabezado de páginas internas */
+.page-head{padding-block:clamp(40px,7vw,80px) clamp(8px,2vw,16px)}
+.page-head h1{font-size:clamp(2rem,4.2vw,3rem);max-width:22ch;letter-spacing:-.02em}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.toc a{font-family:var(--font-display);font-size:.86rem;text-decoration:none;color:var(--ink);border:1px solid var(--line);background:var(--surface);padding:7px 12px;border-radius:10px;transition:transform .18s ease, border-color .2s, color .2s}
+.toc a:hover{border-color:var(--accent);color:var(--accent);transform:scale(1.06)}
+.toc a:active{background:var(--pressed);border-color:var(--pressed);color:#fff}
+
+/* ---------- animación al hacer scroll ----------
+   Cada bloque aparece deslizándose hacia arriba cuando entra en la
+   pantalla (en celular y computadora). Si se vuelve a subir y bajar, se
+   repite. Usa "translate" (no "transform") para no chocar con los
+   efectos de hover. Sin JS todo se ve normal. */
+.js .reveal{opacity:0;translate:0 64px}
+.js .reveal.in{animation:revealUp .85s cubic-bezier(.2,.75,.2,1) var(--rd,0s) both}
+@keyframes revealUp{from{opacity:0;translate:0 64px}to{opacity:1;translate:0 0}}
+
+/* ---------- reproductor de video (azul y blanco) ---------- */
+.player{
+  position:relative;aspect-ratio:16/9;width:100%;max-width:100%;
+  border-radius:16px;overflow:hidden;background:var(--navy);
+  border:1px solid var(--navy-line);box-shadow:0 0 15px var(--glow);
+}
+.player video{width:100%;height:100%;display:block;object-fit:cover;background:#0b1224}
+.p-big{
+  position:absolute;inset:0;margin:auto;width:clamp(64px,10vw,88px);height:clamp(64px,10vw,88px);
+  border-radius:50%;background:#1667c7;border:2px solid #fff;cursor:pointer;
+  display:grid;place-items:center;transition:transform .2s, opacity .25s, background .2s;
+}
+.p-big:hover{transform:scale(1.1);background:#0f56a8}
+.p-big:active{background:var(--pressed)}
+.p-big svg{width:42%;height:42%;fill:#fff;margin-left:6%}
+.player.playing .p-big{opacity:0;pointer-events:none}
+.p-bar{
+  position:absolute;left:12px;right:12px;bottom:12px;
+  display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;
+  background:rgba(14,30,66,.86);color:#fff;transition:opacity .3s;
+}
+.player.playing:not(:hover) .p-bar{opacity:.25}
+.p-bar button{width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:#fff;cursor:pointer;display:grid;place-items:center;flex:none;transition:transform .15s, background .2s}
+.p-bar button:hover{background:rgba(255,255,255,.14);transform:scale(1.1)}
+.p-bar button:active{background:var(--pressed)}
+.p-bar svg{width:20px;height:20px;fill:#fff}
+.p-bar .i-pause{display:none}
+.player.playing .p-bar .i-play{display:none}
+.player.playing .p-bar .i-pause{display:block}
+.p-track{flex:1;min-width:40px;height:8px;border-radius:99px;background:rgba(255,255,255,.28);cursor:pointer;position:relative}
+.p-track i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:99px;background:#fff;box-shadow:inset 0 0 0 2px var(--sky)}
+.p-time{font-family:var(--font-mono);font-size:.76rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+.p-missing{
+  display:none;position:absolute;inset:0;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  text-align:center;padding:20px;color:#c9d3ea;
+  background:radial-gradient(circle at 50% 40%, #1d3366, #0e1a36 75%);
+}
+.p-missing strong{font-family:var(--font-display);font-size:1.05rem;color:#fff}
+.p-missing code{font-size:.76rem;background:rgba(255,255,255,.08);padding:4px 10px;border-radius:8px;word-break:break-all}
+.player.missing .p-missing{display:flex}
+.player.missing .p-big,.player.missing .p-bar{display:none}
+@media (max-width:520px){ .p-time{display:none} }
+
+/* ---------- footer ---------- */
+.site-foot{background:var(--hdr);color:var(--hdr-dim);margin-top:clamp(40px,6vw,80px);position:relative;z-index:1;transition:background-color .35s ease}
+.foot-inner{max-width:var(--maxw);margin:0 auto;display:grid;gap:30px;padding:52px var(--gr) max(36px, env(safe-area-inset-bottom,0px)) var(--gl)}
+@media (min-width:760px){ .foot-inner{grid-template-columns:1fr 1.25fr;align-items:center} }
+.foot-brand{display:flex;flex-direction:column;gap:12px}
+.foot-brand .row{display:flex;align-items:center;gap:12px;color:#fff;font-family:var(--font-display);font-weight:600;letter-spacing:.14em}
+.foot-brand p{font-size:.92rem;max-width:44ch}
+.foot-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start}
+@media (min-width:1000px){ .foot-links{grid-template-columns:repeat(4,minmax(0,1fr))} }
+.foot-links a{
+  display:flex;align-items:center;justify-content:center;min-height:64px;padding:14px 18px;
+  border-radius:14px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);
+  color:#ffffff;text-decoration:none;font-family:var(--font-display);font-weight:500;font-size:1.06rem;
+  transition:transform .2s ease, background-color .2s ease, border-color .2s ease, color .2s ease;
+}
+.foot-links a:hover{transform:scale(1.06);background:rgba(255,255,255,.12);border-color:var(--eye);color:var(--eye)}
+.foot-links a:active{background:var(--pressed);border-color:var(--pressed);color:#fff}
+.eye-screen{
+  display:inline-flex;align-items:center;justify-content:center;padding:9px 13px;border-radius:12px;
+  background:#111;border:2px solid rgba(255,255,255,.75);box-shadow:0 0 12px rgba(0,229,209,.2);
+}
+.foot-school{grid-column:1/-1;padding-top:20px;border-top:1px solid var(--hdr-line);font-size:.88rem}
+.foot-school a{color:var(--eye);font-weight:700}
+
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .eye i{animation:none!important}
+  .js .reveal{opacity:1;translate:none;animation:none!important}
+  .nav-row,.nav-row > *,.brand img{transition:none!important}
+  .btn:hover,.next-card:hover,.brand:hover img,.mode-toggle:hover,.foot-links a:hover{transform:none}
+}
+
+/* ==================================================================
+   ESTILOS DE CADA PÁGINA
+   ================================================================== */
+
+/* ---------- INICIO: hero ---------- */
+.hero{display:grid;gap:clamp(28px,5vw,64px);align-items:center;padding-block:clamp(36px,7vw,84px) clamp(28px,5vw,56px)}
+@media (min-width:900px){ .hero{grid-template-columns:1.08fr .92fr} }
+.hero h1{font-size:clamp(2.1rem,4.4vw,3.3rem);line-height:1.08;letter-spacing:-.02em;max-width:18ch}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero-facts{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:32px;padding-top:22px;border-top:1px solid var(--line);list-style:none}
+.hero-facts li{font-size:.92rem;color:var(--ink-dim)}
+.hero-facts b{color:var(--ink)}
+.hero-visual{position:relative;justify-self:center;width:100%;max-width:460px}
+.hero-photo{
+  display:block;width:100%;max-width:420px;height:auto;
+  filter:drop-shadow(0 16px 20px rgba(15,42,92,.22));
+}
+
+/* ---------- INICIO: pasos ---------- */
+.steps{display:grid;gap:24px;margin-top:32px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.step{display:flex;flex-direction:column;padding:24px}
+.step-n{font-family:var(--font-mono);font-weight:500;font-size:.85rem;color:var(--accent);margin-bottom:12px;display:block}
+.step .screen-chip{align-self:flex-start;margin-top:auto}
+.step p{margin-bottom:14px}
+
+/* ---------- INICIO: vista previa del equipo ---------- */
+.team-preview{display:flex;flex-wrap:wrap;align-items:center;gap:20px;margin-top:26px}
+.avatar-stack{display:flex;align-items:center}
+.avatar-stack span{
+  width:44px;height:44px;border-radius:50%;margin-left:-10px;border:3px solid var(--bg);
+  background:var(--surface-2);display:grid;place-items:center;overflow:hidden;
+  font-family:var(--font-display);font-weight:600;font-size:.8rem;color:var(--ink-dim);
+}
+.avatar-stack span:first-child{margin-left:0}
+.avatar-stack span{position:relative}
+.avatar-stack span img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.avatar-stack .more{background:var(--accent);color:#fff}
+html[data-modo="luna"] .avatar-stack .more{color:#0a1530}
+.team-count{font-family:var(--font-display);font-size:.95rem;color:var(--ink-dim)}
+.team-count b{color:var(--ink);font-size:1.4rem;font-weight:600;margin-right:6px}
+
+/* ---------- EQUIPO: tarjetas de presentación (20 integrantes / 6 expositores) ---------- */
+.team-stats{display:flex;flex-wrap:wrap;gap:12px 32px;margin-top:22px;font-family:var(--font-display);color:var(--ink-dim)}
+.team-stats b{display:block;font-size:2rem;font-weight:600;color:var(--accent);line-height:1}
+.team-grid{display:grid;gap:22px;margin-top:32px;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr))}
+@media (max-width:520px){ .team-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px} .member{padding:18px 10px 14px} .member .media{width:84px;height:84px} }
+.team-cta{justify-content:center;margin-top:40px}
+/* inicio: los 6 expositores en 3 × 2 (2 × 3 en celular) */
+.team-grid.expo{max-width:980px;margin-inline:auto;grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:760px){ .team-grid.expo{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.member{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:22px 16px 18px}
+.member .media{width:104px;height:104px;border-radius:50%;flex:none}
+.member .media-missing{font-size:.66rem;gap:4px;padding:8px}
+.member .media-missing code{font-size:.6rem;padding:2px 5px}
+.member-name{font-family:var(--font-display);font-size:1.05rem;font-weight:600;line-height:1.25}
+.member-role{display:block;margin-top:2px;font-size:.84rem;color:var(--accent)}
+.contacts{display:flex;flex-direction:column;gap:6px;width:100%;margin-top:auto;padding-top:12px;border-top:1px solid var(--line);list-style:none}
+.contacts li{display:flex;align-items:center;justify-content:center;gap:8px;font-size:.82rem;min-width:0}
+.contacts svg{width:16px;height:16px;fill:var(--ink-dim);flex:none}
+.contacts a{color:var(--ink);text-decoration:none;overflow-wrap:anywhere}
+.contacts a:hover{color:var(--accent);text-decoration:underline}
+.why{display:grid;gap:24px;align-items:center}
+@media (min-width:820px){ .why{grid-template-columns:auto 1fr} }
+.why blockquote{margin:0;font-family:var(--font-display);font-size:clamp(1.2rem,2.4vw,1.55rem);line-height:1.4;color:var(--ink);max-width:40ch}
+.school-card{display:grid;gap:22px;align-items:center;background:var(--navy);color:#dfe6f5;border-color:var(--navy-line)}
+@media (min-width:720px){ .school-card{grid-template-columns:120px 1fr} }
+.school-card .media{aspect-ratio:1/1;border-radius:14px;max-width:120px;background:#fff}
+.school-card .media img{object-fit:contain;padding:10px}
+.school-card h2{color:#fff;font-size:clamp(1.4rem,2.6vw,1.9rem)}
+.school-card p{color:#c9d3ea;margin-top:8px;max-width:58ch}
+.school-card a.btn{margin-top:16px}
+.school-card .btn-ghost{border-color:#fff;color:#fff}
+.school-card .btn-ghost:hover{border-color:var(--eye);color:var(--eye)}
+
+/* ---------- JUEGO ---------- */
+.explain-grid{display:grid;gap:24px;margin-top:28px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}
+.explain-grid .card{padding:24px}
+.explain-ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--navy);margin-bottom:14px}
+.explain-ico svg{width:24px;height:24px}
+
+/* ---------- PROTOTIPO ---------- */
+.arch{display:grid;gap:16px;align-items:stretch;margin-top:30px}
+@media (min-width:860px){ .arch{grid-template-columns:1fr 48px 1.15fr 48px 1fr} }
+.arch-node{padding:22px;display:flex;flex-direction:column;gap:8px}
+.arch-node.main{background:var(--navy);border-color:var(--navy-line);color:#fff}
+.arch-node.main h3{color:#fff}
+.arch-node.main p{color:#c9d3ea}
+.arch-tag{font-family:var(--font-mono);font-size:.72rem;color:var(--accent);letter-spacing:.04em}
+.arch-node.main .arch-tag{color:var(--eye)}
+.arch-node ul{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.arch-node li{font-size:.78rem;padding:3px 8px;border-radius:6px;background:var(--surface-2);color:var(--ink)}
+.arch-node.main li{background:var(--navy-2);color:#e5ebf8}
+.arch-link{display:grid;place-items:center;color:var(--accent)}
+.arch-link svg{width:30px;height:30px;transform:rotate(90deg)}
+@media (min-width:860px){ .arch-link svg{transform:none} }
+.screens{display:grid;gap:28px;margin-top:30px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.screen-fig{margin:0;display:flex;flex-direction:column;gap:12px}
+.screen-fig .media{aspect-ratio:712/425;border-radius:12px;border:4px solid #16213e;box-shadow:0 0 15px var(--glow)}
+.screen-fig figcaption{font-size:.9rem;color:var(--ink-dim)}
+.screen-fig figcaption b{color:var(--ink)}
+.hw-grid{display:grid;gap:24px;margin-top:30px;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+.hw{padding:16px 16px 20px;display:flex;flex-direction:column;gap:10px}
+.hw .media{aspect-ratio:4/3}
+.hw h3{font-size:1.05rem;margin:4px 0 0}
+.hw p{font-size:.9rem}
+.flow{list-style:none;margin-top:28px;display:grid;gap:0;position:relative}
+.flow li{display:grid;grid-template-columns:48px 1fr;gap:18px;padding-block:16px;position:relative}
+.flow li::before{content:"";position:absolute;left:23px;top:0;bottom:0;width:2px;background:var(--line)}
+.flow li:first-child::before{top:32px}
+.flow li:last-child::before{bottom:calc(100% - 32px)}
+.flow-dot{position:relative;z-index:1;width:48px;height:48px;border-radius:50%;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--font-mono);font-weight:500;color:var(--accent);box-shadow:0 0 15px var(--glow)}
+.flow h3{font-size:1.08rem;margin-bottom:4px}
+.flow p{color:var(--ink-dim);font-size:.96rem}
+.flow .screen-chip{margin-top:10px}
+.video-grid{display:grid;gap:28px;margin-top:30px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+.video-item h3{font-size:1.1rem;margin-top:14px}
+.video-item p{color:var(--ink-dim);font-size:.94rem;margin-top:4px}
+.status{list-style:none;display:grid;gap:16px;margin-top:28px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.status li{display:flex;align-items:flex-start;gap:14px;padding:18px}
+.status-dot{width:10px;height:10px;border-radius:50%;margin-top:7px;flex:none;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent)}
+.status li div{flex:1;min-width:0}
+.status b{display:block;font-family:var(--font-display);font-weight:600}
+.status span.txt{color:var(--ink-dim);font-size:.94rem}
+
+/* ---------- INICIO: el colegio, destacado ---------- */
+.school-feature{
+  position:relative; overflow:hidden; isolation:isolate;
+  display:grid; gap:clamp(24px,4vw,56px); align-items:center;
+  padding:clamp(30px,5vw,64px);
+  border-radius:24px; color:#fff;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(0,229,209,.22), transparent 42%),
+    radial-gradient(circle at 6% 100%, rgba(79,179,246,.28), transparent 48%),
+    linear-gradient(135deg,#0a1e46 0%,#123a7c 58%,#0f2a5c 100%);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 0 15px var(--glow), 0 22px 50px -24px rgba(8,22,56,.6);
+}
+.school-feature::before{ /* arcos decorativos, como en el banner */
+  content:""; position:absolute; z-index:-1; right:-140px; bottom:-220px; width:560px; height:560px; border-radius:50%;
+  background:repeating-radial-gradient(circle, rgba(255,255,255,.07) 0 2px, transparent 2px 22px);
+}
+@media (min-width:900px){ .school-feature{grid-template-columns:.95fr 1.05fr} }
+.sf-logo{display:flex;justify-content:center;padding:clamp(18px,3vw,30px);border-radius:18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12)}
+.sf-logo img{width:100%;max-width:440px;height:auto;transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+.school-feature:hover .sf-logo img{transform:scale(1.04)}
+.sf-kicker{display:inline-block;font:600 .74rem/1 var(--font-display);letter-spacing:.14em;text-transform:uppercase;color:var(--eye);padding:7px 12px;border-radius:99px;background:rgba(0,229,209,.12);border:1px solid rgba(0,229,209,.35)}
+.school-feature h2{color:#fff;font-size:clamp(1.55rem,3.2vw,2.4rem);line-height:1.15;margin-top:16px;max-width:22ch}
+.school-feature h2 span{color:var(--eye)}
+.school-feature p{color:#d2dcf0;margin-top:14px;max-width:52ch;font-size:1.05rem}
+.school-feature .btn{margin-top:24px}
+
+/* ==================================================================
+   JUEGO: laberinto de Pochi (demo en el inicio, 5 niveles en juego.html)
+   ================================================================== */
+.game{
+  position:relative; padding:clamp(14px,2.4vw,24px); border-radius:16px;
+  background:var(--navy); color:#e9eefb; border:1px solid var(--navy-line);
+  box-shadow:0 0 15px var(--glow); margin-top:30px;
+}
+.g-top{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.g-stats{display:flex;gap:22px;flex-wrap:wrap}
+.g-stat span{display:block;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:#8fa3c8;font-family:var(--font-display)}
+.g-stat b{font-family:var(--font-mono);font-size:1.12rem;color:#fff;font-variant-numeric:tabular-nums}
+.g-pips{display:flex;gap:6px;align-items:center}
+.g-pips i{width:24px;height:8px;border-radius:99px;background:#2c3c66;transition:background .3s}
+.g-pips i.done{background:var(--eye)}
+.g-pips i.cur{background:var(--sky)}
+.g-body{display:grid;gap:16px}
+@media (min-width:880px){ .g-body{grid-template-columns:minmax(0,1fr) 280px} }
+.g-stage{position:relative;min-width:0}
+.g-canvas{
+  display:block;width:100%;height:auto;border-radius:10px;background:#f7f4ee;
+  border:1px solid #2c3c66;touch-action:none;cursor:crosshair;
+}
+.g-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+@media (min-width:560px) and (max-width:879px){ .g-side{display:grid;grid-template-columns:1fr 1fr;align-items:start} .g-side .g-msg{grid-column:1/-1} }
+.g-panel{background:#0f1830;border:1px solid #2c3c66;border-radius:10px;padding:14px}
+.g-label{font-family:var(--font-display);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:#8fa3c8;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+.sig{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.sig-bars{display:flex;gap:4px;align-items:flex-end;height:34px;flex:1;max-width:120px}
+.sig-bars i{flex:1;border-radius:3px;background:#24345e;transition:background .2s}
+.sig-bars i:nth-child(1){height:20%} .sig-bars i:nth-child(2){height:40%} .sig-bars i:nth-child(3){height:60%} .sig-bars i:nth-child(4){height:80%} .sig-bars i:nth-child(5){height:100%}
+.sig-bars.weak i.on{background:var(--orange)}
+.sig-bars.mid i.on{background:var(--sky)}
+.sig-bars.strong i.on{background:var(--eye)}
+.sig-dbm{font-family:var(--font-mono);font-size:1.25rem;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.g-msg{font-size:.92rem;color:#c5d1ea;line-height:1.5;background:#0f1830;border:1px solid #2c3c66;border-radius:10px;padding:12px 14px;min-height:3.2em}
+.g-msg strong{color:var(--eye)}
+.g-help{font-size:.8rem;color:#8fa3c8;line-height:1.55}
+.g-help kbd{font-family:var(--font-mono);font-size:.72rem;background:var(--navy-2);border:1px solid #34467a;border-radius:5px;padding:1px 6px;color:#fff}
+
+/* control táctil */
+.dpad{
+  display:none; grid-template-columns:repeat(3,56px); grid-template-rows:repeat(3,56px); gap:6px;
+  justify-content:center; margin-top:14px; touch-action:none; user-select:none; -webkit-user-select:none;
+}
+@media (hover:none), (pointer:coarse){ .dpad{display:grid} }
+.dpad button{
+  border-radius:12px;background:var(--navy-2);border:1px solid #34467a;color:#fff;cursor:pointer;
+  display:grid;place-items:center;touch-action:none;-webkit-tap-highlight-color:transparent;
+}
+.dpad button svg{width:22px;height:22px;fill:#fff}
+.dpad button{transition:transform .15s ease, background .15s ease}
+.dpad button:hover{transform:scale(1.06)}
+.dpad button.on,.dpad button:active{background:var(--pressed);border-color:var(--eye);transform:scale(.96)}
+.dpad [data-dir="up"]{grid-column:2;grid-row:1}
+.dpad [data-dir="left"]{grid-column:1;grid-row:2}
+.dpad [data-dir="right"]{grid-column:3;grid-row:2}
+.dpad [data-dir="down"]{grid-column:2;grid-row:3}
+.dpad .dpad-c{grid-column:2;grid-row:2;display:grid;place-items:center}
+
+/* ventanas del juego (empezar / te chocaste / nivel superado) */
+.g-modal{
+  position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;
+  padding:16px;border-radius:16px;background:rgba(14,22,44,.74);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+}
+.g-modal[hidden]{display:none}
+.g-card{
+  width:100%;max-width:380px;background:var(--surface);color:var(--ink);border-radius:14px;
+  padding:26px 22px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;
+  box-shadow:0 0 15px var(--glow), 0 24px 50px -20px rgba(0,0,0,.5);animation:gPop .35s cubic-bezier(.2,1.3,.4,1);
+}
+.g-card h3{font-size:clamp(1.3rem,3vw,1.6rem)}
+.g-card p{font-size:.95rem;color:var(--ink-dim)}
+.g-card .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.g-card.crash{border-top:4px solid var(--danger)}
+.g-card.crash h3{color:var(--danger)}
+.g-card.win{border-top:4px solid var(--eye)}
+@keyframes gPop{from{transform:scale(.88);opacity:0}to{transform:none;opacity:1}}
+.g-shake{animation:gShake .4s ease}
+@keyframes gShake{0%,100%{transform:none}20%{transform:translateX(-8px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(3px)}}
+
+/* celebración final: pastilla girando + confeti */
+.celebrate{
+  position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;
+  padding:24px var(--gr) 24px var(--gl);
+  background:color-mix(in srgb, var(--bg) 92%, transparent);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+}
+.celebrate[hidden]{display:none}
+.celebrate canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.cele-card{position:relative;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px;max-width:520px}
+.cele-pill{width:min(58vw,250px);height:auto;filter:drop-shadow(0 18px 24px rgba(20,33,61,.25))}
+.cele-card h2{font-size:clamp(2.8rem,10vw,4.8rem);color:var(--accent);letter-spacing:-.02em}
+.cele-sub{font-size:1.05rem;color:var(--ink-dim)}
+.cele-sub b{color:var(--ink);font-family:var(--font-mono)}
+.cele-best{font-family:var(--font-display);font-weight:600;color:var(--ok);min-height:1.4em}
+.cele-btns{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px}
+.celebrate.go .cele-pill{animation:pillSpin 1.7s cubic-bezier(.2,.8,.2,1) both}
+.celebrate.go h2{animation:celePop .55s cubic-bezier(.2,1.5,.4,1) 1.3s both}
+.celebrate.go .cele-sub,.celebrate.go .cele-best{animation:celeFade .5s ease 1.6s both}
+.celebrate.go .cele-btns{animation:celeFade .5s ease 1.8s both}
+@keyframes pillSpin{0%{transform:scale(.12) rotate(0deg)}65%{transform:scale(1.2) rotate(650deg)}100%{transform:scale(1) rotate(720deg)}}
+@keyframes celePop{from{transform:scale(.3);opacity:0}to{transform:none;opacity:1}}
+@keyframes celeFade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .celebrate.go .cele-pill,.celebrate.go h2,.celebrate.go .cele-sub,.celebrate.go .cele-best,.celebrate.go .cele-btns,.g-card,.g-shake{animation:none}
+}
+/* ==================================================================
+   PANTALLA DE CARGA (inicio): la pantalla de Pochi con sus ojos
+   redondos que pestañean (como la pantalla real) y una barra de carga
+   azul, ancha y larga, que se va llenando. Dura 1.5 s.
+   ================================================================== */
+.intro{
+  position:fixed; inset:0; z-index:400; background:var(--bg);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:clamp(40px,8vh,64px); padding:20px;
+  transition:opacity .35s ease, visibility .35s ease;
+}
+html.play-intro .intro{display:flex}
+html.play-intro body{overflow:hidden}
+.intro.hide{opacity:0;visibility:hidden}
+
+/* la pantalla (fondo casi negro como la real) */
+.intro-screen{
+  --s:clamp(84px,19vw,140px);
+  padding:calc(var(--s)*.34) calc(var(--s)*.5);
+  background:#111111;
+  border:clamp(5px,1vw,8px) solid #e9eef6;
+  border-radius:calc(var(--s)*.3);
+  box-shadow:0 0 0 1px rgba(20,40,80,.18), 0 0 15px var(--glow);
+}
+html[data-modo="luna"] .intro-screen{border-color:#2a3d6b}
+.intro-eyes{display:flex;gap:calc(var(--s)*.4)}
+
+/* cada ojo: aro gris + ojo turquesa redondo */
+.ieye{
+  width:var(--s); height:var(--s); border-radius:50%; flex:none;
+  border:calc(var(--s)*.03) solid #3a3d44;
+  display:grid; place-items:center;
+}
+.ieye i{
+  display:block; width:84%; height:84%; border-radius:50%;
+  background:radial-gradient(circle at 50% 58%, #2ff2df 0%, #00e5d1 62%, #00cdbb 100%);
+  box-shadow:0 0 calc(var(--s)*.22) rgba(0,229,209,.4);
+  transition:height .07s ease-in, border-radius .07s ease-in;
+}
+/* parpadeo: el ojo se vuelve una línea turquesa (segunda imagen) */
+.intro-eyes.closed .ieye i{height:10%;border-radius:99px;box-shadow:0 0 calc(var(--s)*.12) rgba(0,229,209,.4)}
+
+/* barra de carga: larga y ancha, se llena por tramos */
+.intro-bar{
+  position:relative; width:min(760px,86vw); height:18px; border-radius:99px; overflow:hidden;
+  background:color-mix(in srgb, var(--accent) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.intro-bar i{
+  position:absolute; left:0; top:0; bottom:0; width:0; border-radius:inherit;
+  background:
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.22) 0 10px, transparent 10px 20px),
+    linear-gradient(90deg, #1667c7, #4fb3f6);
+  background-size:28.3px 28.3px, 100% 100%;
+  box-shadow:0 0 14px rgba(79,179,246,.55);
+  animation:stripes .6s linear infinite;
+}
+@keyframes stripes{to{background-position:28.3px 0, 0 0}}
+
+@media (prefers-reduced-motion:reduce){
+  .ieye i{transition:none}
+  .intro-bar i{animation:none}
+}
+
+</style>
+</head>
+<body>
+<!-- ============ PANTALLA DE CARGA: la pantalla de Pochi pestañeando + barra azul (1.5 s) ============
+     Recrea las dos imágenes de referencia de la pantalla real:
+     ojos abiertos (círculo turquesa) y parpadeo (línea turquesa). -->
+<div class="intro" id="intro" aria-hidden="true">
+  <div class="intro-screen">
+    <div class="intro-eyes" id="introEyes">
+      <span class="ieye"><i></i></span>
+      <span class="ieye"><i></i></span>
+    </div>
+  </div>
+  <div class="intro-bar"><i id="introFill"></i></div>
+</div>
+<script>
+/* Decide ANTES de pintar si se reproduce: primera entrada al inicio en
+   esta visita, o se llegó tocando el logo del header. */
+(function(){
+  var play = location.hash === '#intro';
+  try{ if(sessionStorage.getItem('pochi_intro') === '1'){ play = true; sessionStorage.removeItem('pochi_intro'); } }catch(e){}
+  try{ if(!sessionStorage.getItem('pochi_intro_visto')){ play = true; } }catch(e){ play = true; }
+  if(play){
+    document.documentElement.classList.add('play-intro');
+    document.getElementById('intro').classList.add('run');
+  }
+})();
+</script>
+
+<header class="site">
+  <div class="nav-row">
+    <a href="index.html#intro" class="brand" data-intro aria-label="Inicio: Colegio Capouilliez y Pochi">
+      <img src="Recursos/logo_header.png" alt="Colegio Capouilliez | Pochi" width="663" height="128">
+    </a>
+    <nav class="links" id="navLinks" aria-label="Principal"><a href="index.html" aria-current="page">Inicio</a><a href="equipo.html">Equipo</a><a href="juego.html">Juego</a><a href="prototipo.html">Prototipo</a></nav>
+    <div class="nav-tools">
+      <button class="mode-toggle" id="modeToggle" type="button" aria-pressed="false" aria-label="Cambiar a modo luna" title="Cambiar a modo luna">
+        <span class="knob" aria-hidden="true"></span>
+        <span class="ico sun" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.6"/><path d="M11 1h2v3.2h-2zM11 19.8h2V23h-2zM1 11h3.2v2H1zM19.8 11H23v2h-3.2zM4.1 5.5l1.4-1.4 2.3 2.3-1.4 1.4zM16.2 17.6l1.4-1.4 2.3 2.3-1.4 1.4zM4.1 18.5l2.3-2.3 1.4 1.4-2.3 2.3zM16.2 6.4l2.3-2.3 1.4 1.4-2.3 2.3z"/></svg></span>
+        <span class="ico moon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/></svg></span>
+      </button>
+      <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navLinks" aria-label="Abrir menú"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+<main id="contenido">
+<div class="wrap">
+  <section class="hero" aria-labelledby="titulo">
+    <div class="reveal">
+      <span class="eyebrow">Robot asistente de medicamentos</span>
+      <h1 id="titulo">Pochi lleva el medicamento hasta la persona. <em>A tiempo, cada vez.</em></h1>
+      <p class="lead">Busca al paciente por la habitación siguiendo la señal de su pulsera, le pregunta si está listo, entrega la pastilla del compartimento correcto y confirma que la tomó.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#como-funciona">Cómo funciona</a>
+        <a class="btn btn-ghost" href="#video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Ver el video</a>
+      </div>
+      <ul class="hero-facts">
+        <li><b>4</b> compartimentos de color</li>
+        <li>Búsqueda por <b>pulsera Bluetooth</b></li>
+        <li><b>Historial</b> de cada toma</li>
+      </ul>
+    </div>
+    <div class="hero-visual reveal">
+      <img class="hero-photo" src="Recursos/pochi_hero.png" alt="Pochi: robot blanco de cuerpo redondeado, con pantalla de ojos azules y dos brazos" loading="lazy">
+    </div>
+  </section>
+
+  <section class="section tight" aria-labelledby="t-problema">
+    <div class="reveal">
+      <span class="eyebrow">El problema</span>
+      <h2 class="h2" id="t-problema">Tomar el medicamento a tiempo es más difícil de lo que parece.</h2>
+    </div>
+    <div class="grid-3">
+      <article class="card pad reveal"><h3>Se olvida o se ignora</h3><p>Una alarma se apaga sin pensarlo. Pochi no suena y se queda quieto: va a buscar a la persona.</p></article>
+      <article class="card pad reveal"><h3>Se confunde la pastilla</h3><p>Cada medicamento vive en su compartimento de color y Pochi entrega solo el que toca a esa hora.</p></article>
+      <article class="card pad reveal"><h3>Nadie confirma</h3><p>Pochi espera a que la persona diga que ya la tomó y lo guarda en un historial que la familia puede revisar.</p></article>
+    </div>
+  </section>
+
+  <section class="section" id="como-funciona" aria-labelledby="t-como">
+    <div class="reveal">
+      <span class="eyebrow">Cómo funciona</span>
+      <h2 class="h2" id="t-como">Cuatro pasos, siempre los mismos.</h2>
+      <p class="lead">A la hora programada, Pochi hace esto. Los textos en las cajas oscuras son los que aparecen en su pantalla.</p>
+    </div>
+    <div class="steps">
+      <article class="card step reveal"><span class="step-n">01</span><h3>Busca al paciente</h3><p>Sigue la señal Bluetooth de la pulsera que la persona lleva puesta y esquiva los muebles con su sensor LiDAR.</p><span class="screen-chip">Buscando…</span></article>
+      <article class="card step reveal"><span class="step-n">02</span><h3>Pregunta</h3><p>En pantalla y en voz alta confirma que es buen momento. Si la persona dice que no, vuelve en 5 minutos.</p><span class="screen-chip">¿Vas a tomarla ahora?</span></article>
+      <article class="card step reveal"><span class="step-n">03</span><h3>Dispensa</h3><p>Suelta la pastilla del compartimento de color correcto y sus brazos suben el plato hasta la persona.</p><span class="screen-chip">Tu pastilla está lista</span></article>
+      <article class="card step reveal"><span class="step-n">04</span><h3>Confirma</h3><p>Espera el toque en "Ya la tomé" y guarda la hora en el historial de tomas.</p><span class="screen-chip">¡Muy bien!</span></article>
+    </div>
+  </section>
+
+  <section class="section tight" id="demo" aria-labelledby="t-demo">
+    <div class="reveal">
+      <span class="eyebrow">Pruébalo</span>
+      <h2 class="h2" id="t-demo">Pochi no ve al paciente: sigue la señal de su pulsera.</h2>
+      <p class="lead">Lleva a Pochi por el laberinto hasta la pulsera sin tocar las paredes. El medidor muestra la intensidad de la señal, igual que la mide Pochi en la vida real.</p>
+    </div>
+    <div class="game reveal" id="demoGame">
+  <div class="g-top">
+    <div class="g-stats">
+      <div class="g-stat"><span>Nivel</span><b data-g="level">1 / 1</b></div>
+      <div class="g-stat"><span>Tiempo</span><b data-g="time">0.0 s</b></div>
+      
+    </div>
+    
+  </div>
+  <div class="g-body">
+    <div class="g-stage"><canvas class="g-canvas" width="468" height="324" aria-label="Laberinto: lleva a Pochi hasta la pulsera sin tocar las paredes"></canvas></div>
+    <div class="g-side">
+      <div class="g-panel">
+        <div class="g-label"><span>Señal de la pulsera</span><span>RSSI</span></div>
+        <div class="sig"><div class="sig-bars weak"><i class="on"></i><i></i><i></i><i></i><i></i></div><span class="sig-dbm">−95 dBm</span></div>
+      </div>
+      <p class="g-msg" aria-live="polite"></p>
+      <p class="g-help"><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> o <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. En celular: arrastra el dedo sobre el laberinto o usa las flechas.</p>
+      <div class="dpad" aria-label="Control táctil"><button type="button" data-dir="up" aria-label="Arriba"><svg viewBox="0 0 24 24"><path d="M12 6l7 9H5z"/></svg></button><button type="button" data-dir="left" aria-label="Izquierda"><svg viewBox="0 0 24 24"><path d="M6 12l9-7v14z"/></svg></button><span class="dpad-c"><span class="eyes eyes-sm"><span class="eye"><i></i></span><span class="eye"><i></i></span></span></span><button type="button" data-dir="right" aria-label="Derecha"><svg viewBox="0 0 24 24"><path d="M18 12l-9 7V5z"/></svg></button><button type="button" data-dir="down" aria-label="Abajo"><svg viewBox="0 0 24 24"><path d="M12 18l-7-9h14z"/></svg></button></div>
+    </div>
+  </div>
+  <div class="g-modal" hidden></div>
+</div>
+  </section>
+
+  <section class="section" id="video" aria-labelledby="t-video">
+    <div class="reveal">
+      <span class="eyebrow">Video principal</span>
+      <h2 class="h2" id="t-video">Pochi en acción.</h2>
+    </div>
+    <div class="reveal" style="margin-top:28px">
+      <div class="player" data-src="Recursos/video_principal.mp4" data-poster="Recursos/video_principal_portada.jpg" data-title="Pochi en acción"></div>
+    </div>
+  </section>
+
+  <section class="section tight" aria-labelledby="t-equipo">
+    <div class="reveal">
+      <span class="eyebrow">Equipo expositor</span>
+      <h2 class="h2" id="t-equipo">Nuestro equipo expositor hoy en CONCAPAN</h2>
+      <p class="lead">Ellos te presentan a Pochi hoy. En total somos 20 integrantes.</p>
+    </div>
+    <div class="team-grid expo" id="expoGrid"></div>
+    <script>
+/* ===================================================================
+   EQUIPO EXPOSITOR: las 6 personas que presentan a Pochi hoy.
+   - foto: archivo dentro de Recursos/ (si todavía no está, la tarjeta
+     muestra el nombre que debe tener).
+   - correo, github y linkedin son opcionales: déjenlos en '' si no se usan.
+   =================================================================== */
+var EXPOSITORES = [
+  { nombre:'Integrante 1', rol:'Área por definir', foto:'Recursos/equipo_01.jpg', correo:'', github:'', linkedin:'' },
+  { nombre:'Integrante 2', rol:'Área por definir', foto:'Recursos/equipo_02.jpg', correo:'', github:'', linkedin:'' },
+  { nombre:'Mario', rol:'Área por definir', foto:'Recursos/equipo_03.jpg', correo:'', github:'', linkedin:'' },
+  { nombre:'Integrante 4', rol:'Área por definir', foto:'Recursos/equipo_04.jpg', correo:'', github:'', linkedin:'' },
+  { nombre:'Integrante 5', rol:'Área por definir', foto:'Recursos/equipo_05.jpg', correo:'', github:'', linkedin:'' },
+  { nombre:'Integrante 6', rol:'Área por definir', foto:'Recursos/equipo_06.jpg', correo:'', github:'', linkedin:'' }
+];
+function pochiTeam(grid, lista){
+  var ICONS = { correo:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zm2 2v.5l7 4.5 7-4.5V7zm0 2.9V17h14V9.9l-7 4.5z"/></svg>', github:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 2.9.8.1-.7.4-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg>', linkedin:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1.8 7v8h2.6v-8zm1.3-4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM10 10v8h2.6v-4.3c0-1.1.2-2.2 1.6-2.2 1.4 0 1.4 1.3 1.4 2.3V18H18v-4.8c0-2.4-.5-4.2-3.3-4.2-1.3 0-2.2.7-2.6 1.4V10z"/></svg>' };
+  function el(tag, cls, text){ var e = document.createElement(tag); if(cls){ e.className = cls; } if(text){ e.textContent = text; } return e; }
+  lista.forEach(function(p){
+    var card = el('article', 'card member reveal');
+    var fig = el('figure', 'media');
+    var img = document.createElement('img');
+    img.alt = 'Foto de ' + p.nombre; img.loading = 'lazy';
+    img.onerror = function(){ fig.classList.add('missing'); };
+    img.src = p.foto;
+    var miss = el('figcaption', 'media-missing'); miss.appendChild(el('code', '', p.foto));
+    fig.appendChild(img); fig.appendChild(miss); card.appendChild(fig);
+    var who = el('div'); who.appendChild(el('div', 'member-name', p.nombre)); who.appendChild(el('span', 'member-role', p.rol)); card.appendChild(who);
+    var list = el('ul', 'contacts');
+    [['correo', p.correo ? 'mailto:' + p.correo : '', p.correo], ['github', p.github, 'GitHub'], ['linkedin', p.linkedin, 'LinkedIn']].forEach(function(c){
+      if(!c[1]){ return; }
+      var li = el('li'); li.innerHTML = ICONS[c[0]];
+      var a = el('a', '', c[2]); a.href = c[1]; if(c[0] !== 'correo'){ a.target = '_blank'; a.rel = 'noopener'; }
+      li.appendChild(a); list.appendChild(li);
+    });
+    if(!list.children.length){ var li = el('li', '', 'Contacto por agregar'); li.style.color = 'var(--ink-dim)'; list.appendChild(li); }
+    card.appendChild(list);
+    grid.appendChild(card);
+  });
+}
+pochiTeam(document.getElementById('expoGrid'), EXPOSITORES);
+</script>
+    <div class="cta-row team-cta reveal">
+      <a class="btn btn-primary btn-lg" href="equipo.html">Conoce al resto del equipo <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 5.3 19.9 12l-6.7 6.7-1.4-1.4 4.3-4.3H4v-2h12.1l-4.3-4.3z"/></svg></a>
+    </div>
+  </section>
+
+  <section class="section tight" aria-labelledby="t-colegio">
+    <div class="school-feature reveal">
+      <div class="sf-logo"><img src="Recursos/logo_header.png" alt="Colegio Capouilliez | Pochi" width="663" height="128" loading="lazy"></div>
+      <div class="sf-text">
+        <span class="sf-kicker">Hecho en Guatemala</span>
+        <h2 id="t-colegio">Desarrollado por estudiantes pre-universitarios del <span>Colegio Capouilliez</span></h2>
+        <p>Pochi nació en las aulas del colegio: un proyecto de ingeniería real, diseñado, construido y programado por estudiantes.</p>
+        <a class="btn btn-light" href="https://www.capouilliez.edu.gt" target="_blank" rel="noopener">Visitar el sitio del colegio <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 5.3 19.9 12l-6.7 6.7-1.4-1.4 4.3-4.3H4v-2h12.1l-4.3-4.3z"/></svg></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section tight" aria-label="Más sobre Pochi">
+    <div class="next-grid"><a class="card next-card reveal" href="juego.html"><span class="kicker">Juego</span><h3>El reto completo: 5 laberintos</h3><p>Más grandes, más engañosos y con niebla en los últimos niveles.</p><span class="go">Jugar →</span></a><a class="card next-card reveal" href="prototipo.html"><span class="kicker">Prototipo</span><h3>Cómo está construido</h3><p>Arquitectura, hardware, la interfaz real y los videos técnicos.</p><span class="go">Ver el prototipo →</span></a><a class="card next-card reveal" href="equipo.html"><span class="kicker">Equipo</span><h3>Quiénes construimos a Pochi</h3><p>Los 20 integrantes del equipo y cómo contactarnos.</p><span class="go">Conocer al equipo →</span></a></div>
+  </section>
+</div>
+</main>
+<footer class="site-foot">
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <div class="row"><span class="eye-screen"><span class="eyes eyes-sm"><span class="eye"><i></i></span><span class="eye"><i></i></span></span></span>POCHI</div>
+      <p>Robot asistente de medicamentos para adultos mayores: busca, pregunta, entrega y confirma.</p>
+    </div>
+    <nav class="foot-links" aria-label="Pie de página"><a href="index.html">Inicio</a><a href="equipo.html">Equipo</a><a href="juego.html">Juego</a><a href="prototipo.html">Prototipo</a></nav>
+    <p class="foot-school">Proyecto desarrollado por estudiantes pre-universitarios del <a href="https://www.capouilliez.edu.gt" target="_blank" rel="noopener">Colegio Capouilliez</a>, Guatemala.</p>
+  </div>
+</footer>
+<script>
+/* ==================================================================
+   JS común de todas las páginas: modo sol/luna, menú móvil, header
+   que se encoge al bajar, botones que marcan el clic,
+   efecto de escala al hacer scroll y reproductores de video.
+   ================================================================== */
+(function(){
+  'use strict';
+  var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  /* ---------- modo sol / luna ----------
+     El modo se aplica antes de pintar (script en <head>); aquí solo se
+     cambia y se guarda para que se mantenga en todas las páginas. */
+  var modeBtn = document.getElementById('modeToggle');
+  function paintModeBtn(){
+    if(!modeBtn){ return; }
+    var luna = document.documentElement.getAttribute('data-modo') === 'luna';
+    modeBtn.setAttribute('aria-pressed', luna ? 'true' : 'false');
+    modeBtn.setAttribute('aria-label', luna ? 'Modo luna activo. Cambiar a modo sol' : 'Modo sol activo. Cambiar a modo luna');
+    modeBtn.setAttribute('title', luna ? 'Cambiar a modo sol' : 'Cambiar a modo luna');
+  }
+  if(modeBtn){
+    paintModeBtn();
+    modeBtn.addEventListener('click', function(){
+      var luna = document.documentElement.getAttribute('data-modo') !== 'luna';
+      document.documentElement.setAttribute('data-modo', luna ? 'luna' : 'sol');
+      try{ localStorage.setItem('pochi_modo', luna ? 'luna' : 'sol'); }catch(e){}
+      paintModeBtn();
+    });
+  }
+
+  /* ---------- botones: el clic deja marcado el color un momento ---------- */
+  document.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.btn') : null;
+    if(!b){ return; }
+    b.classList.add('pressed');
+    setTimeout(function(){ b.classList.remove('pressed'); }, 450);
+  }, true);
+
+  /* ---------- menú móvil ---------- */
+  var toggle = document.getElementById('navToggle');
+  var links = document.getElementById('navLinks');
+  function closeMenu(){
+    if(links){ links.classList.remove('open'); }
+    if(toggle){ toggle.setAttribute('aria-expanded','false'); }
+  }
+  if(toggle && links){
+    toggle.addEventListener('click', function(){
+      var open = links.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ closeMenu(); } });
+  }
+
+  /* ---------- header: grande arriba, se encoge al bajar ---------- */
+  var hdr = document.querySelector('header.site');
+  if(hdr){
+    var setHdr = function(){
+      var y = window.pageYOffset || 0;
+      if(y > 24){ hdr.classList.add('compact'); } else if(y < 8){ hdr.classList.remove('compact'); }
+    };
+    window.addEventListener('scroll', setHdr, { passive:true });
+    setHdr();
+  }
+
+  /* ---------- logo del header ----------
+     Lleva al inicio y reproduce la pantalla de carga de los ojos.
+     Los demás enlaces navegan normal, sin animación. */
+  document.addEventListener('click', function(e){
+    if(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey){ return; }
+    var a = e.target.closest ? e.target.closest('a[data-intro]') : null;
+    if(!a){ return; }
+    closeMenu();
+    if(typeof window.pochiIntro === 'function'){
+      e.preventDefault();
+      window.pochiIntro(); // ya estamos en el inicio: se reproduce aquí mismo
+    } else {
+      try{ sessionStorage.setItem('pochi_intro','1'); }catch(err){}
+    }
+  });
+
+  /* ---------- animación al hacer scroll ----------
+     Cada bloque .reveal aparece deslizándose hacia arriba al entrar en
+     la pantalla. Los que entran juntos salen uno tras otro. Si un
+     bloque vuelve a quedar por debajo de la pantalla, se "rearma" para
+     repetir la animación la próxima vez que se baje. */
+  var root = document.documentElement;
+  function startReveal(){
+    var items = [].slice.call(document.querySelectorAll('.reveal'));
+    if(!items.length){ return; }
+    if(reduceMotion || !('IntersectionObserver' in window)){
+      items.forEach(function(el){ el.classList.add('in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function(entries){
+      var entering = [];
+      entries.forEach(function(en){
+        if(en.isIntersecting){ entering.push(en); }
+        else if(en.boundingClientRect.top > (en.rootBounds ? en.rootBounds.bottom : window.innerHeight)){
+          en.target.classList.remove('in'); // quedó abajo: se repetirá al volver
+        }
+      });
+      entering.sort(function(x, y){ return (x.boundingClientRect.top - y.boundingClientRect.top) || (x.boundingClientRect.left - y.boundingClientRect.left); });
+      entering.forEach(function(en, i){
+        if(en.target.classList.contains('in')){ return; }
+        en.target.style.setProperty('--rd', Math.min(i * 0.09, 0.45).toFixed(2) + 's');
+        en.target.classList.add('in');
+      });
+    }, { threshold:0.08, rootMargin:'0px 0px -6% 0px' });
+    items.forEach(function(el){ io.observe(el); });
+  }
+  if(root.classList.contains('play-intro')){
+    window.addEventListener('pochi:intro-fin', startReveal, { once:true });
+  } else {
+    startReveal();
+  }
+
+  /* ---------- reproductores de video (azul y blanco) ----------
+     <div class="player" data-src="Recursos/video.mp4" data-title="..."></div>
+     Si el archivo todavía no está en Recursos/, se muestra cuál falta. */
+  var ICON_PLAY = '<svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>';
+  var ICON_PAUSE = '<svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+  var ICON_FULL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5v2H6v3zm10-5h6v5h-2V6h-4zM4 15h2v3h3v2H4zm14 3v-3h2v5h-5v-2z"/></svg>';
+  function fmt(s){ if(!isFinite(s)){ s = 0; } var m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
+
+  [].forEach.call(document.querySelectorAll('.player'), function(p){
+    var src = p.getAttribute('data-src') || '';
+    var poster = p.getAttribute('data-poster') || '';
+    var title = p.getAttribute('data-title') || 'Video';
+    p.innerHTML =
+      '<video playsinline preload="metadata"></video>' +
+      '<button class="p-big" type="button" aria-label="Reproducir: ' + title + '">' + ICON_PLAY + '</button>' +
+      '<div class="p-bar">' +
+        '<button class="p-play" type="button" aria-label="Reproducir o pausar">' + ICON_PLAY + ICON_PAUSE + '</button>' +
+        '<div class="p-track" role="slider" tabindex="0" aria-label="Progreso del video" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>' +
+        '<span class="p-time">0:00 / 0:00</span>' +
+        '<button class="p-full" type="button" aria-label="Pantalla completa">' + ICON_FULL + '</button>' +
+      '</div>' +
+      '<div class="p-missing"><div class="eyes eyes-md"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>' +
+        '<strong>' + title + '</strong><span>Video pendiente, va en:</span><code>' + (src || 'Recursos/…') + '</code></div>';
+
+    var v = p.querySelector('video');
+    var fill = p.querySelector('.p-track i');
+    var track = p.querySelector('.p-track');
+    var time = p.querySelector('.p-time');
+    var markMissing = function(){ p.classList.add('missing'); };
+
+    if(!src){ markMissing(); return; }
+    if(poster){ v.setAttribute('poster', poster); }
+    var source = document.createElement('source');
+    source.src = src;
+    source.addEventListener('error', markMissing);
+    v.addEventListener('error', markMissing);
+    v.appendChild(source);
+
+    var toggle = function(){
+      if(v.paused){ var pr = v.play(); if(pr && pr.catch){ pr.catch(function(){}); } }
+      else { v.pause(); }
+    };
+    p.querySelector('.p-big').addEventListener('click', toggle);
+    p.querySelector('.p-play').addEventListener('click', toggle);
+    v.addEventListener('click', toggle);
+    v.addEventListener('play', function(){ p.classList.add('playing'); });
+    v.addEventListener('pause', function(){ p.classList.remove('playing'); });
+    v.addEventListener('ended', function(){ p.classList.remove('playing'); });
+    var paint = function(){
+      var pct = v.duration ? (v.currentTime / v.duration) * 100 : 0;
+      fill.style.width = pct + '%';
+      track.setAttribute('aria-valuenow', Math.round(pct));
+      time.textContent = fmt(v.currentTime) + ' / ' + fmt(v.duration);
+    };
+    v.addEventListener('timeupdate', paint);
+    v.addEventListener('loadedmetadata', paint);
+    track.addEventListener('click', function(e){
+      var r = track.getBoundingClientRect();
+      if(v.duration){ v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * v.duration; }
+    });
+    track.addEventListener('keydown', function(e){
+      if(!v.duration){ return; }
+      if(e.key === 'ArrowRight'){ v.currentTime = Math.min(v.duration, v.currentTime + 5); e.preventDefault(); }
+      if(e.key === 'ArrowLeft'){ v.currentTime = Math.max(0, v.currentTime - 5); e.preventDefault(); }
+    });
+    p.querySelector('.p-full').addEventListener('click', function(){
+      try{
+        var req = p.requestFullscreen || p.webkitRequestFullscreen;
+        if(req){ var r = req.call(p); if(r && r.catch){ r.catch(function(){ if(v.webkitEnterFullscreen){ v.webkitEnterFullscreen(); } }); } }
+        else if(v.webkitEnterFullscreen){ v.webkitEnterFullscreen(); }
+      }catch(err){}
+    });
+  });
+})();
+
+</script>
+<script>
+/* ==================================================================
+   MOTOR DEL LABERINTO DE POCHI
+   - Laberintos generados con semilla fija: cada nivel siempre es el
+     mismo y siempre tiene solución. La pulsera se coloca en la celda
+     más lejana a la salida.
+   - Tocar una pared = "¡Te chocaste!" y se repite el nivel.
+   - Medidor de señal (RSSI) como en la vida real: entre más cerca de
+     la pulsera, más barras y menos dBm negativos.
+   - Niveles con "niebla": solo se ve lo que alcanza el LiDAR.
+   Uso: PochiMaze(elementoRaíz, { levels:[...], demo:true|false })
+   ================================================================== */
+window.PochiMaze = function(root, opts){
+  'use strict';
+  var canvas = root.querySelector('.g-canvas');
+  if(!canvas || !canvas.getContext){ return; }
+  var ctx = canvas.getContext('2d');
+  var LEVELS = opts.levels;
+  var DEMO = !!opts.demo;
+  var CS = 36;                                   // tamaño de cada celda (unidades internas)
+  var R = CS * 0.26;                             // radio de choque de Pochi
+  var DPR = Math.min(2, window.devicePixelRatio || 1);
+  var BEST_KEY = 'pochi_mejor_tiempo';
+  var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  var q = function(s){ return root.querySelector(s); };
+  var ui = {
+    level: q('[data-g="level"]'), time: q('[data-g="time"]'), best: q('[data-g="best"]'),
+    bars: q('.sig-bars'), barItems: [].slice.call(root.querySelectorAll('.sig-bars i')),
+    dbm: q('.sig-dbm'), msg: q('.g-msg'), modal: q('.g-modal'),
+    pips: [].slice.call(root.querySelectorAll('.g-pips i'))
+  };
+
+  var st = { li:0, grid:null, cols:0, rows:0, start:null, goal:null, p:{x:0,y:0},
+             running:false, keys:{}, ptr:null, time:0, last:0, t:0, lastBars:-1 };
+
+  /* ---------- generación del laberinto ---------- */
+  function rng(a){
+    return function(){
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeMaze(c, r, seed, loops){
+    var rand = rng(seed), g = [], x, y, i;
+    for(y = 0; y < r; y++){ g.push([]); for(x = 0; x < c; x++){ g[y].push(1); } }
+    var stack = [[1,1]]; g[1][1] = 0;
+    while(stack.length){
+      var cur = stack[stack.length - 1];
+      var dirs = [[2,0],[-2,0],[0,2],[0,-2]];
+      for(i = 3; i > 0; i--){ var j = Math.floor(rand() * (i + 1)); var tmp = dirs[i]; dirs[i] = dirs[j]; dirs[j] = tmp; }
+      var moved = false;
+      for(i = 0; i < 4; i++){
+        var nx = cur[0] + dirs[i][0], ny = cur[1] + dirs[i][1];
+        if(nx > 0 && ny > 0 && nx < c - 1 && ny < r - 1 && g[ny][nx] === 1){
+          g[cur[1] + dirs[i][1] / 2][cur[0] + dirs[i][0] / 2] = 0;
+          g[ny][nx] = 0; stack.push([nx, ny]); moved = true; break;
+        }
+      }
+      if(!moved){ stack.pop(); }
+    }
+    // algunos atajos extra: hacen el laberinto más engañoso (varios caminos)
+    var made = 0, tries = 0;
+    while(made < (loops || 0) && tries < 800){
+      tries++;
+      x = 1 + Math.floor(rand() * (c - 2)); y = 1 + Math.floor(rand() * (r - 2));
+      if(g[y][x] !== 1){ continue; }
+      var horiz = g[y][x-1] === 0 && g[y][x+1] === 0 && g[y-1][x] === 1 && g[y+1][x] === 1;
+      var vert  = g[y-1][x] === 0 && g[y+1][x] === 0 && g[y][x-1] === 1 && g[y][x+1] === 1;
+      if(horiz || vert){ g[y][x] = 0; made++; }
+    }
+    return g;
+  }
+  function farthestCell(g, c, r){
+    var dist = [], y, x, queue = [[1,1]], head = 0, best = [1,1];
+    for(y = 0; y < r; y++){ dist.push([]); for(x = 0; x < c; x++){ dist[y].push(-1); } }
+    dist[1][1] = 0;
+    while(head < queue.length){
+      var cur = queue[head++];
+      if(dist[cur[1]][cur[0]] > dist[best[1]][best[0]]){ best = cur; }
+      var n = [[1,0],[-1,0],[0,1],[0,-1]];
+      for(var i = 0; i < 4; i++){
+        var nx = cur[0] + n[i][0], ny = cur[1] + n[i][1];
+        if(g[ny][nx] === 0 && dist[ny][nx] < 0){ dist[ny][nx] = dist[cur[1]][cur[0]] + 1; queue.push([nx, ny]); }
+      }
+    }
+    return best;
+  }
+
+  /* ---------- niveles ---------- */
+  function setLevel(i){
+    st.li = i;
+    var L = LEVELS[i];
+    st.cols = L.cols; st.rows = L.rows;
+    st.grid = makeMaze(L.cols, L.rows, L.seed, L.loops);
+    var f = farthestCell(st.grid, L.cols, L.rows);
+    st.start = { x:1.5 * CS, y:1.5 * CS };
+    st.goal = { x:(f[0] + .5) * CS, y:(f[1] + .5) * CS };
+    canvas.width = Math.round(L.cols * CS * DPR);
+    canvas.height = Math.round(L.rows * CS * DPR);
+    canvas.style.aspectRatio = L.cols + ' / ' + L.rows;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    resetPos();
+    if(ui.level){ ui.level.textContent = (i + 1) + ' / ' + LEVELS.length; }
+    ui.pips.forEach(function(p, k){ p.classList.toggle('done', k < i); p.classList.toggle('cur', k === i); });
+    say(L.hint);
+    draw();
+  }
+  function resetPos(){
+    st.p = { x:st.start.x, y:st.start.y };
+    st.keys = {}; st.ptr = null;
+    [].forEach.call(root.querySelectorAll('.dpad .on'), function(b){ b.classList.remove('on'); });
+  }
+  function say(html){ if(ui.msg){ ui.msg.innerHTML = html; } }
+
+  /* ---------- choque con paredes ---------- */
+  function hitsWall(x, y){
+    var r = R * .92;
+    var x0 = Math.floor((x - r) / CS), x1 = Math.floor((x + r) / CS);
+    var y0 = Math.floor((y - r) / CS), y1 = Math.floor((y + r) / CS);
+    for(var cy = y0; cy <= y1; cy++){
+      for(var cx = x0; cx <= x1; cx++){
+        if(cy < 0 || cx < 0 || cy >= st.rows || cx >= st.cols){ return true; }
+        if(st.grid[cy][cx] === 1){
+          var nx = Math.max(cx * CS, Math.min(x, (cx + 1) * CS));
+          var ny = Math.max(cy * CS, Math.min(y, (cy + 1) * CS));
+          if((x - nx) * (x - nx) + (y - ny) * (y - ny) < r * r){ return true; }
+        }
+      }
+    }
+    return false;
+  }
+
+  /* ---------- dibujo ---------- */
+  function rr(x, y, w, h, r){
+    ctx.beginPath();
+    if(ctx.roundRect){ ctx.roundRect(x, y, w, h, r); } else { ctx.rect(x, y, w, h); }
+  }
+  function drawBracelet(x, y){
+    var s = CS / 36, i;
+    for(i = 0; i < 3; i++){
+      var ph = ((st.t * .7) + i / 3) % 1;
+      ctx.strokeStyle = 'rgba(21,101,192,' + (0.55 * (1 - ph)).toFixed(3) + ')';
+      ctx.lineWidth = 2 * s;
+      ctx.beginPath(); ctx.arc(x, y, (8 + ph * 22) * s, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = '#232a3a'; rr(x - 5 * s, y - 14 * s, 10 * s, 28 * s, 3 * s); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#b9c6da'; ctx.lineWidth = 1.2 * s;
+    rr(x - 9 * s, y - 9 * s, 18 * s, 18 * s, 4.5 * s); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#151a24'; rr(x - 6 * s, y - 6.5 * s, 12 * s, 13 * s, 2.5 * s); ctx.fill();
+    ctx.fillStyle = '#ff7a2f';
+    for(i = 0; i < 3; i++){ ctx.fillRect(x - 3.2 * s, y - 4 * s + i * 3 * s, 6.4 * s, 1.9 * s); }
+  }
+  function drawPochi(x, y){
+    var r = R * 1.2;
+    ctx.fillStyle = 'rgba(20,33,61,.2)';
+    ctx.beginPath(); ctx.ellipse(x + r * .12, y + r * .2, r, r * .95, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#9fb0cb'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#0e1424'; rr(x - r * .74, y - r * .48, r * 1.48, r * .9, r * .26); ctx.fill();
+    var blink = (st.t % 3.4) > 3.22 ? .15 : 1;
+    var er = r * .22;
+    [-1, 1].forEach(function(side){
+      var ex = x + side * r * .34, ey = y - r * .03;
+      ctx.fillStyle = '#00e5d1';
+      ctx.beginPath(); ctx.ellipse(ex, ey, er, er * blink, 0, 0, Math.PI * 2); ctx.fill();
+      if(blink === 1){ ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(ex + er * .35, ey - er * .38, er * .3, 0, Math.PI * 2); ctx.fill(); }
+    });
+  }
+  function draw(){
+    var W = st.cols * CS, H = st.rows * CS, x, y, g = st.grid;
+    ctx.fillStyle = '#f7f4ee'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(20,33,61,.045)';
+    for(y = 0; y < st.rows; y++){ for(x = 0; x < st.cols; x++){ if(g[y][x] === 0 && (x + y) % 2 === 0){ ctx.fillRect(x * CS, y * CS, CS, CS); } } }
+    // salida
+    ctx.fillStyle = 'rgba(21,101,192,.16)'; rr(st.start.x - CS * .38, st.start.y - CS * .38, CS * .76, CS * .76, CS * .18); ctx.fill();
+    // paredes
+    for(y = 0; y < st.rows; y++){
+      for(x = 0; x < st.cols; x++){
+        if(g[y][x] === 1){
+          ctx.fillStyle = '#16213e'; ctx.fillRect(x * CS - .5, y * CS - .5, CS + 1, CS + 1);
+          if(y + 1 < st.rows && g[y + 1][x] === 0){ ctx.fillStyle = '#2a3d6e'; ctx.fillRect(x * CS, (y + 1) * CS - 4, CS, 4); }
+        }
+      }
+    }
+    drawBracelet(st.goal.x, st.goal.y);
+    drawPochi(st.p.x, st.p.y);
+    // niebla: Pochi solo "ve" hasta donde llega su LiDAR
+    var L = LEVELS[st.li];
+    if(L.fog){
+      var fr = L.fog * CS;
+      var gr = ctx.createRadialGradient(st.p.x, st.p.y, fr * .45, st.p.x, st.p.y, fr);
+      gr.addColorStop(0, 'rgba(14,22,44,0)');
+      gr.addColorStop(1, 'rgba(14,22,44,1)');
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = 'rgba(0,229,209,.35)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.arc(st.p.x, st.p.y, fr * .72, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    paintSignal();
+  }
+
+  /* ---------- medidor de señal (RSSI) ---------- */
+  function paintSignal(){
+    var d = Math.hypot(st.p.x - st.goal.x, st.p.y - st.goal.y);
+    var max = Math.hypot(st.cols, st.rows) * CS;
+    var s = Math.max(0, Math.min(1, 1 - d / (max * .8)));
+    s = Math.pow(s, 1.5);
+    var bars = Math.max(1, Math.ceil(s * 5));
+    var dbm = Math.round(-95 + s * 57);
+    if(ui.dbm){ ui.dbm.textContent = dbm + ' dBm'; }
+    if(bars !== st.lastBars && ui.bars){
+      st.lastBars = bars;
+      ui.barItems.forEach(function(b, k){ b.classList.toggle('on', k < bars); });
+      ui.bars.className = 'sig-bars ' + (bars <= 2 ? 'weak' : bars <= 3 ? 'mid' : 'strong');
+    }
+  }
+  function paintTime(){ if(ui.time){ ui.time.textContent = st.time.toFixed(1) + ' s'; } }
+  function loadBest(){ try{ var v = parseFloat(localStorage.getItem(BEST_KEY)); return isFinite(v) ? v : null; }catch(e){ return null; } }
+  function paintBest(){ if(ui.best){ var b = loadBest(); ui.best.textContent = b ? b.toFixed(1) + ' s' : '—'; } }
+
+  /* ---------- ciclo del juego ---------- */
+  function loop(ts){
+    if(!st.running){ return; }
+    var dt = st.last ? Math.min(.05, (ts - st.last) / 1000) : 0;
+    st.last = ts; st.t += dt; st.time += dt;
+    var L = LEVELS[st.li];
+    var speed = (L.speed || 3.2) * CS;
+    var vx = 0, vy = 0, k = st.keys;
+    if(k.left){ vx -= 1; } if(k.right){ vx += 1; } if(k.up){ vy -= 1; } if(k.down){ vy += 1; }
+    var step = speed * dt;
+    if(!vx && !vy && st.ptr){
+      var dx = st.ptr.x - st.p.x, dy = st.ptr.y - st.p.y, dl = Math.hypot(dx, dy);
+      if(dl > 2){ vx = dx / dl; vy = dy / dl; step = Math.min(step, dl); }
+    }
+    var len = Math.hypot(vx, vy);
+    if(len > 0 && step > 0){
+      vx /= len; vy /= len;
+      var n = Math.max(1, Math.ceil(step / (CS * .12)));
+      for(var i = 0; i < n; i++){
+        var nx = st.p.x + vx * step / n, ny = st.p.y + vy * step / n;
+        st.p.x = nx; st.p.y = ny;
+        if(hitsWall(nx, ny)){ draw(); paintTime(); crash(); return; }
+      }
+    }
+    if(Math.hypot(st.p.x - st.goal.x, st.p.y - st.goal.y) < CS * .42){ draw(); paintTime(); win(); return; }
+    draw(); paintTime();
+    requestAnimationFrame(loop);
+  }
+  function go(){
+    hideModal();
+    st.running = true; st.last = 0;
+    requestAnimationFrame(loop);
+  }
+  function stop(){ st.running = false; st.keys = {}; st.ptr = null; }
+
+  /* ---------- ventanas ---------- */
+  var EYES = '<div class="eyes eyes-md"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>';
+  var EYES_CLOSED = '<div class="eyes eyes-md closed"><span class="eye"><i></i></span><span class="eye"><i></i></span></div>';
+  function showModal(o){
+    ui.modal.innerHTML = '<div class="g-card ' + (o.cls || '') + '" role="dialog" aria-modal="true" aria-label="' + o.title.replace(/"/g,'') + '">' +
+      (o.closed ? EYES_CLOSED : EYES) + '<h3>' + o.title + '</h3><p>' + o.text + '</p><div class="btns"></div></div>';
+    var box = ui.modal.querySelector('.btns');
+    o.buttons.forEach(function(b){
+      var el;
+      if(b.href){ el = document.createElement('a'); el.href = b.href; }
+      else { el = document.createElement('button'); el.type = 'button'; el.addEventListener('click', b.onClick); }
+      el.className = 'btn ' + (b.primary ? 'btn-primary' : 'btn-ghost');
+      el.textContent = b.label;
+      box.appendChild(el);
+    });
+    ui.modal.hidden = false;
+    var first = box.querySelector('.btn');
+    if(first && o.focus !== false){ try{ first.focus({ preventScroll:true }); }catch(e){ first.focus(); } }
+  }
+  function hideModal(){ ui.modal.hidden = true; ui.modal.innerHTML = ''; }
+
+  function crash(){
+    stop();
+    if(!reduceMotion){ root.classList.remove('g-shake'); void root.offsetWidth; root.classList.add('g-shake'); }
+    showModal({
+      cls:'crash', closed:true, title:'¡Te chocaste!',
+      text:'Pochi tocó una pared. En la vida real su LiDAR lo frena antes de chocar; aquí tú eres su LiDAR.',
+      buttons:[{ label:'Repetir nivel', primary:true, onClick:function(){ resetPos(); draw(); go(); } }]
+    });
+  }
+  function win(){
+    stop();
+    var L = LEVELS[st.li];
+    if(DEMO){
+      showModal({
+        cls:'win', title:'¡Lo lograste!',
+        text:'Pochi encontró la pulsera en ' + st.time.toFixed(1) + ' s. El juego completo tiene 5 niveles, laberintos más grandes y zonas donde solo ves lo que alcanza el LiDAR.',
+        buttons:[
+          { label:'Jugar otra vez', onClick:function(){ st.time = 0; paintTime(); setLevel(0); go(); } },
+          { label:'Juego completo', primary:true, href:'juego.html' }
+        ]
+      });
+      return;
+    }
+    if(st.li < LEVELS.length - 1){
+      var next = LEVELS[st.li + 1];
+      showModal({
+        cls:'win', title:'¡Nivel ' + (st.li + 1) + ' superado!',
+        text:'Pochi llegó a la pulsera. Siguiente: ' + next.name + '.',
+        buttons:[{ label:'Siguiente nivel', primary:true, onClick:function(){ setLevel(st.li + 1); go(); } }]
+      });
+      return;
+    }
+    celebrate();
+  }
+
+  /* ---------- celebración final ---------- */
+  function celebrate(){
+    var c = document.getElementById('celebrate');
+    var total = st.time, prev = loadBest(), isBest = prev === null || total < prev;
+    if(isBest){ try{ localStorage.setItem(BEST_KEY, String(total)); }catch(e){} }
+    paintBest();
+    if(!c){ return; }
+    c.querySelector('[data-c="time"]').textContent = total.toFixed(1) + ' s';
+    c.querySelector('[data-c="best"]').textContent = isBest ? '¡Nuevo mejor tiempo!' : 'Tu mejor tiempo: ' + prev.toFixed(1) + ' s';
+    c.hidden = false;
+    c.classList.remove('go'); void c.offsetWidth; c.classList.add('go');
+    var again = c.querySelector('[data-c="again"]');
+    again.onclick = function(){ c.hidden = true; confettiStop(); st.time = 0; paintTime(); setLevel(0); go(); };
+    try{ again.focus({ preventScroll:true }); }catch(e){}
+    if(!reduceMotion){ confetti(c.querySelector('canvas')); }
+  }
+  var confettiRaf = 0;
+  function confettiStop(){ cancelAnimationFrame(confettiRaf); confettiRaf = 0; }
+  function confetti(cv){
+    confettiStop();
+    var cx = cv.getContext('2d'), w, h, dpr = DPR;
+    w = cv.width = Math.round(window.innerWidth * dpr);
+    h = cv.height = Math.round(window.innerHeight * dpr);
+    var colors = ['#1565c0','#4fb3f6','#00e5d1','#f7c531','#e53935','#ff7a2f','#16213e'];
+    var parts = [];
+    for(var i = 0; i < 190; i++){
+      parts.push({
+        x: Math.random() * w, y: -Math.random() * h * .7 - 20 * dpr,
+        vx: (Math.random() - .5) * 3 * dpr, vy: (2 + Math.random() * 3.5) * dpr,
+        r: (5 + Math.random() * 7) * dpr, a: Math.random() * 6.28, va: (Math.random() - .5) * .3,
+        c: colors[i % colors.length], shape: i % 3, wob: Math.random() * 6.28
+      });
+    }
+    var t0 = performance.now();
+    function frame(ts){
+      var el = ts - t0, alive = false;
+      cx.clearRect(0, 0, w, h);
+      for(var k = 0; k < parts.length; k++){
+        var p = parts[k];
+        p.vy += .045 * dpr; p.x += p.vx + Math.sin(ts / 500 + p.wob) * .7 * dpr; p.y += p.vy; p.a += p.va;
+        if(p.y < h + 30){ alive = true; }
+        cx.save(); cx.translate(p.x, p.y); cx.rotate(p.a); cx.fillStyle = p.c;
+        if(p.shape === 0){ cx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); }
+        else if(p.shape === 1){ cx.beginPath(); cx.arc(0, 0, p.r / 2.4, 0, 6.283); cx.fill(); }
+        else { cx.fillRect(-p.r / 3, -p.r / 2, p.r / 1.5, p.r); }
+        cx.restore();
+      }
+      if(alive && el < 8000){ confettiRaf = requestAnimationFrame(frame); } else { cx.clearRect(0, 0, w, h); }
+    }
+    confettiRaf = requestAnimationFrame(frame);
+  }
+
+  /* ---------- controles ---------- */
+  var KEYS = { ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right', w:'up', W:'up', s:'down', S:'down', a:'left', A:'left', d:'right', D:'right' };
+  window.addEventListener('keydown', function(e){
+    var k = KEYS[e.key];
+    if(!k || !st.running){ return; }       // solo captura teclas mientras se juega
+    e.preventDefault(); st.keys[k] = true;
+  });
+  window.addEventListener('keyup', function(e){ var k = KEYS[e.key]; if(k){ st.keys[k] = false; } });
+  window.addEventListener('blur', function(){ st.keys = {}; st.ptr = null; });
+
+  function toCanvas(e){
+    var r = canvas.getBoundingClientRect();
+    return { x:(e.clientX - r.left) * (st.cols * CS / r.width), y:(e.clientY - r.top) * (st.rows * CS / r.height) };
+  }
+  canvas.addEventListener('pointerdown', function(e){
+    if(!st.running){ return; }
+    e.preventDefault();
+    st.ptr = toCanvas(e);
+    try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  canvas.addEventListener('pointermove', function(e){ if(st.ptr){ st.ptr = toCanvas(e); } });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(function(ev){ canvas.addEventListener(ev, function(){ st.ptr = null; }); });
+
+  [].forEach.call(root.querySelectorAll('.dpad [data-dir]'), function(b){
+    var dir = b.getAttribute('data-dir');
+    var on = function(e){ e.preventDefault(); st.keys[dir] = true; b.classList.add('on'); try{ b.setPointerCapture(e.pointerId); }catch(err){} };
+    var off = function(){ st.keys[dir] = false; b.classList.remove('on'); };
+    b.addEventListener('pointerdown', on);
+    b.addEventListener('pointerup', off);
+    b.addEventListener('pointercancel', off);
+    b.addEventListener('lostpointercapture', off);
+    b.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  });
+
+  /* ---------- arranque ---------- */
+  root.__pochi = { st:st, setLevel:setLevel, CS:CS }; // acceso para pruebas desde la consola
+  paintBest(); paintTime();
+  setLevel(0);
+  showModal({
+    focus:false,
+    title: DEMO ? 'Guía a Pochi hasta la pulsera' : '5 niveles. Sin tocar las paredes.',
+    text: DEMO
+      ? 'Muévete con las flechas, con WASD o arrastrando el dedo sobre el laberinto. Si tocas una pared, repites.'
+      : 'Cada nivel es más grande. En los niveles 4 y 5 hay niebla: solo verás lo que alcanza el LiDAR de Pochi y tendrás que guiarte por la señal.',
+    buttons:[{ label: DEMO ? 'Empezar' : 'Empezar nivel 1', primary:true, onClick:go }]
+  });
+};
+
+PochiMaze(document.getElementById('demoGame'), { demo:true, levels:[{ name:'Nivel 1', cols:13, rows:9, seed:7, loops:0, speed:3.0, hint:'Nivel 1: encuentra la salida del laberinto. Las barras de señal suben cuando te acercas a la pulsera.' }] });
+</script>
+<script>
+/* Pantalla de carga: 1.5 s. Los ojos pestañean cambiando entre los dos
+   "cuadros" de la pantalla real (abiertos / línea) y la barra se llena
+   por tramos, como una carga de verdad. Queda marcada como vista
+   durante esta visita; el logo del header la vuelve a reproducir. */
+(function(){
+  'use strict';
+  var intro = document.getElementById('intro');
+  if(!intro){ return; }
+  var root = document.documentElement;
+  var eyes = document.getElementById('introEyes');
+  var fill = document.getElementById('introFill');
+  var DURATION = 1500;
+  var BLINKS = [[330, 140], [880, 130]];            // [inicio, duración] de cada parpadeo (ms)
+  var STEPS = [[0,0],[180,14],[360,22],[620,58],[820,64],[1080,86],[1250,93],[1380,100]]; // [ms, %]
+  var timers = [], raf = 0, t0 = 0;
+
+  function clearAll(){ timers.forEach(clearTimeout); timers = []; cancelAnimationFrame(raf); }
+  function progress(t){
+    for(var i = 1; i < STEPS.length; i++){
+      if(t <= STEPS[i][0]){
+        var a = STEPS[i-1], b = STEPS[i], k = (t - a[0]) / (b[0] - a[0]);
+        k = k * k * (3 - 2 * k); // suave dentro de cada tramo
+        return a[1] + (b[1] - a[1]) * k;
+      }
+    }
+    return 100;
+  }
+  function tick(now){
+    var t = now - t0;
+    fill.style.width = progress(t).toFixed(2) + '%';
+    if(t < STEPS[STEPS.length - 1][0]){ raf = requestAnimationFrame(tick); }
+  }
+  function finish(){
+    clearAll();
+    fill.style.width = '100%';
+    intro.classList.add('hide');
+    try{ sessionStorage.setItem('pochi_intro_visto','1'); }catch(e){}
+    if(location.hash === '#intro'){
+      try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+    }
+    setTimeout(function(){
+      root.classList.remove('play-intro');
+      intro.classList.remove('run','hide');
+      eyes.classList.remove('closed');
+      try{ window.dispatchEvent(new Event('pochi:intro-fin')); }catch(e){}
+    }, 360);
+  }
+  function run(){
+    clearAll();
+    eyes.classList.remove('closed');
+    fill.style.width = '0%';
+    BLINKS.forEach(function(b){
+      timers.push(setTimeout(function(){ eyes.classList.add('closed'); }, b[0]));
+      timers.push(setTimeout(function(){ eyes.classList.remove('closed'); }, b[0] + b[1]));
+    });
+    t0 = performance.now();
+    raf = requestAnimationFrame(tick);
+    timers.push(setTimeout(finish, DURATION));
+  }
+  function start(){
+    root.classList.add('play-intro');
+    intro.classList.remove('hide');
+    intro.classList.add('run');
+    run();
+  }
+  window.pochiIntro = function(){ window.scrollTo(0, 0); start(); };
+  if(root.classList.contains('play-intro')){ run(); }
+})();
+
+</script>
+</body>
+</html>
